@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Keygen Arcade — игра в лицензионные ключи</title>
+  <meta name="description" content="Придумай секрет, придумай HWID — получи ключ. Уникальный = очки. Повтор = ноль.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <span class="brand__prompt">$</span>
+        <span class="brand__name">keygen-arcade</span>
+        <span class="brand__tag">придумай секрет → получи ключ</span>
+      </div>
+      <div class="top__right">
+        <div class="balance">
+          <span class="balance__label">очки</span>
+          <span class="balance__value" id="score-value">0</span>
+          <span class="balance__label balance__label--sub">серия: <span id="streak-value">0</span></span>
+          <span class="balance__label balance__label--sub">ключей: <span id="history-count">0</span></span>
+        </div>
+        <div class="balance">
+          <span class="balance__label">фишки</span>
+          <span class="balance__value" id="balance-value">1000</span>
+          <button class="btn btn--ghost btn--tiny" id="balance-reset" type="button">сброс</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="card card--input">
+      <label class="field">
+        <span class="field__label">Секретный ключ</span>
+        <input id="secret" class="field__input field__input--mono" type="text" spellcheck="false"
+               autocomplete="off" placeholder="придумай сам — хоть котлета42">
+      </label>
+      <label class="field">
+        <span class="field__label">HWID</span>
+        <input id="hwid" class="field__input field__input--mono" type="text" spellcheck="false"
+               autocomplete="off" maxlength="64" placeholder="тоже придумай — хоть DESKTOP-1">
+      </label>
+      <label class="field">
+        <span class="field__label">Схема ключа</span>
+        <select id="algo" class="field__input"></select>
+      </label>
+      <p class="card__note" id="algo-note"></p>
+    </section>
+
+    <section class="card card--key" id="key-card">
+      <div class="key-card__head">
+        <span class="field__label">Текущий ключ</span>
+        <span class="key-card__badge" id="key-algo">—</span>
+      </div>
+      <div class="key-line">
+        <code class="key" id="key-value">— — — —</code>
+        <button class="btn btn--ghost btn--tiny" id="key-copy" type="button" disabled>копировать</button>
+      </div>
+      <p class="key-card__meta" id="key-meta">сгенерируй ключ — он появится здесь</p>
+    </section>
+
+    <nav class="tabs" id="tabs">
+      <button class="tab is-active" data-tab="roulette" type="button">01 · генератор</button>
+      <button class="tab" data-tab="mines" type="button">02 · мины</button>
+      <button class="tab" data-tab="checksum" type="button">03 · контрольный символ</button>
+      <button class="tab" data-tab="chain" type="button">04 · цепочка</button>
+      <button class="tab" data-tab="safe" type="button">05 · сейф</button>
+    </nav>
+
+    <section class="panel is-active" data-panel="roulette">
+      <div class="panel__head">
+        <h2>Генератор ключей</h2>
+        <p>
+          Придумай <b>секрет</b> и <b>HWID</b> — получи ключ по выбранной схеме.
+          Каждый <b>уникальный</b> ключ даёт очки. <b>Редкие</b> паттерны
+          (hex-слово, палиндром, все цифры) — <b>больше</b> очков.
+          <b>Серия</b> уникальных ключей даёт бонус, повтор её обнуляет.
+        </p>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn--primary" id="spin" type="button">Сгенерировать ключ</button>
+      </div>
+
+      <div class="result" id="roulette-result" hidden></div>
+      <div class="keygen-history" id="keygen-history"></div>
+    </section>
+
+    <section class="panel" data-panel="mines">
+      <div class="panel__head">
+        <h2>Мины на ключе</h2>
+        <p>Поле 4×4, мины расставлены из текущего ключа.
+           Открываешь клетку — множитель растёт. От 1 до 8 мин.</p>
+      </div>
+
+      <div class="controls">
+        <label class="field field--inline">
+          <span class="field__label">мин</span>
+          <select id="mines-count" class="field__input">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+          </select>
+        </label>
+        <label class="field field--inline">
+          <span class="field__label">ставка</span>
+          <input id="mines-stake" class="field__input" type="number" min="10" step="10" value="50">
+        </label>
+        <button class="btn btn--primary" id="mines-start" type="button">Начать</button>
+        <button class="btn btn--ghost" id="mines-cashout" type="button" disabled>Забрать</button>
+      </div>
+
+      <p class="status" id="mines-status">сначала сгенерируй ключ</p>
+      <div class="mines-grid" id="mines-grid"></div>
+    </section>
+
+    <section class="panel" data-panel="checksum">
+      <div class="panel__head">
+        <h2>Контрольный символ</h2>
+        <p>
+          Ключ по одной из контрольных схем пришёл без конца.
+          Схема выбирается случайно: <b>Crockford mod 37</b>, <b>Luhn mod 10</b>
+          или <b>IBAN mod 97</b>. Посчитай недостающее сам.
+        </p>
+      </div>
+
+      <div class="checksum-task" id="checksum-task">—</div>
+
+      <div class="controls">
+        <input id="checksum-answer" class="field__input field__input--mono field__input--short"
+               type="text" maxlength="1" placeholder="?" autocomplete="off" spellcheck="false">
+        <label class="field field--inline">
+          <span class="field__label">ставка</span>
+          <input id="checksum-stake" class="field__input" type="number" min="10" step="10" value="30">
+        </label>
+        <button class="btn btn--primary" id="checksum-submit" type="button">Ответить</button>
+        <button class="btn btn--ghost" id="checksum-hint-btn" type="button">Подсказка</button>
+        <button class="btn btn--ghost" id="checksum-new" type="button">Другой пример</button>
+      </div>
+
+      <pre class="checksum-hint" id="checksum-hint" hidden></pre>
+      <div class="result" id="checksum-result" hidden></div>
+    </section>
+
+    <section class="panel" data-panel="chain">
+      <div class="panel__head">
+        <h2>Цепочка</h2>
+        <p>
+          Шестнадцать hex-символов ключа идут друг за другом.
+          Предскажи следующий: <b>больше</b>, <b>меньше</b> или <b>равно</b>.
+          Угадал — множитель вырос. Ошибся — ставка сгорела.
+          В любой момент можно забрать.
+        </p>
+      </div>
+
+      <div class="controls">
+        <label class="field field--inline">
+          <span class="field__label">ставка</span>
+          <input id="chain-stake" class="field__input" type="number" min="10" step="10" value="50">
+        </label>
+        <button class="btn btn--primary" id="chain-start" type="button">Старт</button>
+        <button class="btn btn--ghost" id="chain-cashout" type="button" disabled>Забрать</button>
+      </div>
+
+      <p class="status" id="chain-status">сначала сгенерируй ключ</p>
+      <div class="chain-strip" id="chain-strip"></div>
+      <div class="chain-buttons" id="chain-buttons"></div>
+      <div class="result" id="chain-result" hidden></div>
+    </section>
+
+    <section class="panel" data-panel="safe">
+      <div class="panel__head">
+        <h2>Сейф</h2>
+        <p>
+          Загадан четырёхсимвольный hex-код из твоего ключа.
+          Угадай его за <b>8 попыток</b>. Каждая показывает, сколько символов
+          на своём месте и сколько есть, но не там. Чем быстрее угадаешь — тем больше множитель.
+        </p>
+      </div>
+
+      <div class="controls">
+        <label class="field field--inline">
+          <span class="field__label">ставка</span>
+          <input id="safe-stake" class="field__input" type="number" min="10" step="10" value="50">
+        </label>
+        <button class="btn btn--primary" id="safe-start" type="button">Старт</button>
+      </div>
+
+      <div class="controls">
+        <input id="safe-input" class="field__input field__input--mono field__input--short"
+               maxlength="4" placeholder="????" disabled autocomplete="off" spellcheck="false"
+               style="width: 110px; text-align: center; font-size: 18px; letter-spacing: 0.3em;">
+        <button class="btn btn--primary" id="safe-submit" type="button" disabled>Проверить</button>
+      </div>
+
+      <p class="status" id="safe-status">сначала сгенерируй ключ</p>
+      <div class="safe-history" id="safe-history"></div>
+      <div class="result" id="safe-result" hidden></div>
+    </section>
+
+    <footer class="foot">
+      игра, а не защита. секрета в коде нет — ты его придумываешь сам.
+    </footer>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
